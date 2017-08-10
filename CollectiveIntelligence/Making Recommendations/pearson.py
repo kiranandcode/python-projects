@@ -65,3 +65,38 @@ def topMatches(prefs, person, n=5, simmilarity=pearson_distance):
 
 for person in critics:
     print("Top matches for ", person, " was ", topMatches(critics, person))
+
+
+# gets all recommendations for a person by multiplying the score of the critics by their simmilarity
+def getRecommendations(prefs, person, n=5,similarity=pearson_distance):
+    totals = {}
+    simmilarity_sums ={}
+    for other in prefs:
+        if other == person:
+            continue
+
+        # calculate the simmilarity
+        sim = similarity(prefs, person, other)
+
+        # ignore any people who aren't simmilar 
+        if sim <= 0:
+            continue
+
+        for item in prefs[other]:
+            # only consider movies they haven't seen
+            if item not in prefs[person]:
+                # if it doesn't exist in the list of totals, set it's count as 0
+                totals.setdefault(item,0)
+                totals[item] += prefs[other][item]*sim
+
+                simmilarity_sums.setdefault(item,0)
+                simmilarity_sums[item] += sim
+    
+    rankings = [(total/simmilarity_sums[item], item) for item, total in totals.items()]
+
+    rankings.sort(key=lambda x: x[0])
+    rankings.reverse()
+    return rankings
+
+for score, item in getRecommendations(critics, 'Toby'):
+    print("For ", item, " the score is ", score)
