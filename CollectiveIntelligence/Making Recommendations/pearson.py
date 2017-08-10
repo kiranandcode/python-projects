@@ -1,4 +1,4 @@
-from recommendations import critics
+from recommendations import critics, transformPrefs
 from math import sqrt
 from itertools import combinations
 
@@ -99,4 +99,8 @@ def getRecommendations(prefs, person, n=5,similarity=pearson_distance):
     return rankings
 
 for score, item in getRecommendations(critics, 'Toby'):
+    print("For ", item, " the score is ", score)
+
+
+for score, item in getRecommendations(transformPrefs(critics), 'Just My Luck'):
     print("For ", item, " the score is ", score)
