@@ -12,3 +12,4 @@ C# would be nice, however due to the requirement of a windows environment or Mon
 
 Java was initially my first preference. However, I love Java's Libraries and syntax. It's comfortable and easy to use. However it's requirement of a JVM (I realize that this is debatably the main selling point of Java), makes it less flexible than I would like.
 
+C++ was my final decision. Powerful but homely, expansive and complex. These are all values I treasure in a programming language. It's expansive nature make it a suitable complement to Python's simpler api.
