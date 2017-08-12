@@ -188,3 +188,20 @@ def drawnode(draw, clust, x,y,scaling,labels):
         drawnode(draw, clust.right,x+ll, bottom-h2/2,scaling,labels)
     else:
         draw.text((x+5, y-7), labels[clust.id], (0,0,0))
+
+
+def rotatematrix(data):
+    newdata = []
+
+    # for each word
+    for i in range(len(data[0])):
+        # construct a vector of data, consisting of the number of occurances on websites
+        newrow = []
+        for j in range(len(data)):
+            if len(data[j]) <= i:
+                newrow.append(0.0)
+            else:
+                newrow.append(data[j][i])
+
+        newdata.append(newrow)
+    return newdata
