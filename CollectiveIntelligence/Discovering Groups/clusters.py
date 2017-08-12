@@ -20,6 +20,23 @@ def readfile(filename, encoding=None):
         print(name)
         rownames.append(name)
         data.append([float(x) for x in p[1:]])
+
+    inital_len = len(data[0])
+    current_len = inital_len
+
+    for row in data:
+        current_len = max(len(row),current_len)
+        while len(row) < current_len:
+            row.append(0.0)
+
+    if current_len != inital_len:
+        for row in data:
+            current_len = max(len(row),current_len)
+            while len(row) < current_len:
+                row.append(0.0)
+
+
+
     return rownames, colnames, data
 
 
