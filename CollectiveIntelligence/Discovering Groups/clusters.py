@@ -1,4 +1,5 @@
 from math import sqrt
+import random
 from PIL import Image, ImageDraw
 
 def readfile(filename, encoding=None):
@@ -49,6 +50,7 @@ def pearson(v1, v2):
 
     
     The pearson correleation coefficient is modified to return a smaller value the closer two values are - to simulate the euclidean distance measure.
+
     """
 
     sum1 = sum(v1)
@@ -75,11 +77,26 @@ def pearson(v1, v2):
 
     return 1.0 - (num/den)
 
-def tanimotot(v1,v2):
+def tanimoto(v1,v2):
     """
 
         The tanimoto coefficient is defined as the ratio of
         the intersection of two sets by the union
+
+        we'd want to use this over a pearson correlation
+        coefficient if our data set is defined only by a small
+        number of discreet values.
+
+        The pearson correlation coefficient measures correlation -
+        as in providing a measure of how much as one variable
+        increases, so does the other.
+
+        If the ranges are small and discreet, then we're unlikely
+        to see such a correlation.
+
+        It's also easier for a small difference to have a large impact.
+
+        Thus we might prefer something like the tanimoto 
 
     """
     c1,c2,shr = 0,0,0
@@ -235,3 +252,71 @@ def rotatematrix(data):
 
         newdata.append(newrow)
     return newdata
+
+
+def scaledown(data, distance=pearson, rate=0.01):
+    n = len(data)
+
+    # calculate the desired distance for all objects
+    realdist = [[distance(data[i],data[j]) for j in range(n)]
+                    for i in range(0,n)]
+
+    outersum = 0.0
+
+    # we randomly place each element
+    loc = [[random.random(), random.random()] for i in range(n)]
+
+    fakedist = [[0.0 for j in range(n)] for i in range(n)]
+
+    lasterror=None
+    # Loop the find best location part 1000 times 
+    for m in range(0,1000):
+
+        # calculate the %dif between act distance and desired dist
+        for i in range(n):
+            for j in range(n):
+                fakedist[i][j] = sqrt(sum(pow(loc[i][x]-loc[j][x],2) for x in range(len(loc[i]))))
+
+        grad = [[0.0,0.0] for i in range(n)]
+
+        # calulate and move the points
+        totalerror=0
+        for k in range(n):
+            for j in range(n):
+                if j == k: continue
+
+                errorterm = 0.0
+                if realdist[j][k] != 0:
+                    errorterm = (fakedist[j][k]-realdist[j][k])/realdist[j][k]
+
+                # apply a force on the point in the direction of each point, proportional to the error and inversely proportional to the distance
+                grad[k][0]+=((loc[k][0] - loc[j][0])/fakedist[j][k])*errorterm;
+
+                totalerror += abs(errorterm)
+        print(totalerror)
+
+
+        # if movement worsened the overall distance, we have
+        # reached the minimum
+        if lasterror and lasterror < totalerror: break
+
+        lasterror = totalerror
+
+
+
+        for k in range(n):
+            loc[k][0] -= rate * grad[k][0]
+            loc[k][1] -= rate * grad[k][1]
+
+        return loc
+
+
+
+def draw2d(data, labels, jpeg="mds2d.jpg"):
+    img = Image.new('RGB', (2000,2000), (255,255,255))
+    draw = ImageDraw.Draw(img)
+    for i in range(len(data)):
+        x = (data[i][0]+0.5)*1000
+        y = (data[i][1]+0.5)*1000
+        draw.text((x,y), labels[i], (0,0,0))
+    img.save(jpeg, 'JPEG')
