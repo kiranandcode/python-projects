@@ -1,6 +1,9 @@
 import urllib
 from bs4 import BeautifulSoup
 from uritools import urijoin
+import re
+
+from sqlite3 import dbapi2 as sqlite
 
 # words to ignore
 ignorewords=set(['the','of','to','and','a','in','is','it'])
@@ -8,16 +11,28 @@ ignorewords=set(['the','of','to','and','a','in','is','it'])
 class crawler:
     # initialize the crawler with the dbname
     def __init__(self, dbname):
-        pass
+        self.con = sqlite.connect(dbname)
 
     # clear all records on end
     def __del__(self):
-        pass
+        self.con.close()
 
     
     def dbcommit(self):
-        pass
+        self.con.commit()
 
+    def createindextables(self):
+        self.con.execute('create table urllist(url)')
+        self.con.execute('create table wordlist(word)')
+        self.con.execute('create table wordlocation(urlid,wordid,location)')
+        self.con.execute('create table link(fromid integer,toid integer)')
+        self.con.execute('create table linkwords(wordid,linkid)')
+        self.con.execute('create index wordidx on wordlist(word)')
+        self.con.execute('create index urlidx on urllist(url)')
+        self.con.execute('create index wordurlidx on wordlocation(wordid)')
+        self.con.execute('create index urltoidx on link(toid)')
+        self.con.execute('create index urlfromidx on link(fromid)')
+        self.dbcommit()
     
     #  getting an entry id or adding it if not present
     def getentryid(self,table, field, value, createnew=True):
@@ -25,15 +40,41 @@ class crawler:
 
     # index a page
     def addtoindex(self, url, soup):
+        if self.isindexed(url): return
         print('Indexing {}'.format(url))
+
+        text = self.gettextonly(soup)
+        words = self.separatewords(text)
+
+        urlid = self.getentryid('urllist','url',url)
+
+        for i in range(len(words)):
+            word = words[i]
+            if word in ignorewords: continue
+            wordid = self.getentryid('wordlist', 'word', word)
+            self.con.execute('insert into wordlocation(urlid,wordid,location) \
+                    values ({},{},{})'.format(urlid,wordid,i))
+
+
 
     # extract a page only
     def gettextonly(self, soup):
-        return None
+        v = soup.string
+        if v == None:
+            c = soup.contents
+            resulttext=''
+            for t in c:
+                # recurse to traverse the dom
+                subtext = self.gettextonly(t)
+                resulttext += subtext + '\n'
+            return resulttext
+        else:
+            return v.strip()
 
     # separate words by any non-whitespace character
     def separatewords(self, text):
-        return None
+        splitter = re.compile('\\W*')
+        return [s.lower() for s in splitter.split(text) if s != '']
 
 
     def isindexed(self, url):
@@ -58,6 +99,7 @@ class crawler:
 
                 if not c:
                     continue
+
 
                 # after retrieving the html
                 soup = BeautifulSoup(c.read())
