@@ -36,7 +36,15 @@ class crawler:
     
     #  getting an entry id or adding it if not present
     def getentryid(self,table, field, value, createnew=True):
-        return None
+        cur = self.con.execute(
+                "select rowid from {} wher {}='{}'".format(table,field,value))
+        res = cur.fetchone()
+        if(res == None):
+            cur = self.con.execute(
+                    "insert into {}({}) values ('{}')".format(table,field,value))
+            return cur.lastrowid
+        else:
+            return res[0]
 
     # index a page
     def addtoindex(self, url, soup):
@@ -81,7 +89,18 @@ class crawler:
         return False
 
     def addlinkref(self, urlFrom, urlTo, linkText):
-        pass
+        words = self.separatewords(linkText)
+        fromid = self.getentryid('urllist','url',urlfrom)
+        toid = self.getentryid('urllist','url', urlTo)
+
+        if fromid == toid:
+            return
+        cur = self.con.execute("insert into link(fromid,toid) values({},{})".format(fromid,toid))
+        linkid = cur.lastrowid
+        for word in words:
+            if word in ignorewords: continue
+            wordid = self.getentryid('wordlist','word',word)
+            self.con.execute("insert into linkwords(linkid,wordid) values({},{})".format(linkid,wordid))
 
     def crawl(self, pages, depth=2):
         # iterate for each depth
@@ -132,5 +151,3 @@ class crawler:
             # recurse
             pages =newpages
 
-    def createindextables(self):
-        pass
