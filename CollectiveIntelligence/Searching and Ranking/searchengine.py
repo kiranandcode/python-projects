@@ -37,12 +37,15 @@ class crawler:
     #  getting an entry id or adding it if not present
     def getentryid(self,table, field, value, createnew=True):
         cur = self.con.execute(
-                "select rowid from {} wher {}='{}'".format(table,field,value))
+                "select rowid from {} where {}='{}'".format(table,field,value))
         res = cur.fetchone()
         if(res == None):
-            cur = self.con.execute(
-                    "insert into {}({}) values ('{}')".format(table,field,value))
-            return cur.lastrowid
+            if createnew:
+                cur = self.con.execute(
+                        "insert into {}({}) values ('{}')".format(table,field,value))
+                return cur.lastrowid
+            else:
+                return None
         else:
             return res[0]
 
@@ -86,6 +89,13 @@ class crawler:
 
 
     def isindexed(self, url):
+        cur = self.con.execute("select rowid from urllist where url={}".format(url))
+        res = cur.fetchone()
+        if res:
+            # check whether the urlid has been indexed, we could have a link that's in urlist, but hasn't actually been trawled
+            v = self.con.execute("select * from wordlocation where urlid={}".format(res[0])).fetchone()
+            if v:
+                return True
         return False
 
     def addlinkref(self, urlFrom, urlTo, linkText):
@@ -123,7 +133,7 @@ class crawler:
                 # after retrieving the html
                 soup = BeautifulSoup(c.read())
 
-                # index page 
+                # index page (as in add all the words into the words table)
                 self.addtoindex(page, soup)
 
                 # iterate through all the links in the page
