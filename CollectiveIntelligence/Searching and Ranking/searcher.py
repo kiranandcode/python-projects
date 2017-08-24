@@ -50,3 +50,29 @@ class Searcher:
         rows = [row for row in cur]
 
         return rows,wordids
+
+
+    def getscoredlist(self, rows, wordids):
+        ## mapping of urls (first entry in tuple to score values
+        totalscores=dict([(row[0],0), for row in rows])
+
+
+        weights = []
+
+        for(weight,scores) in weights:
+            for url in totalscores:
+                totalscores[url] += weight*scores[url]
+
+        return totalscores
+
+    def geturlname(self, id):
+        return self.con.execute(
+                "select url from urllist where rowid={}".format(id)).fetchone()[0]
+    
+    def query(self,q):
+        rows, wordids = self.getmatchrows(q)
+        scores = self.getscoredlist(rows,wordids)
+        rankedsores = sorted((score,url) for (url,score) in scores.items(), reverse=1)
+        for (score, urlid) in rankedscores[0:10]:
+            print("{}\t{}".format(score,self.geturlname(urlid)))
+
