@@ -49,6 +49,7 @@ class Searcher:
         cur = self.con.execute(fullquery)
         rows = [row for row in cur]
 
+        # returns a list of tuples (urlid, wordlocation location...) where each word in the input string is found in the url
         return rows,wordids
 
 
@@ -57,7 +58,8 @@ class Searcher:
         totalscores=dict([(row[0],0), for row in rows])
 
 
-        weights = []
+        weights = [(1.0, self.frequencyscore(rows)]
+        # insert search code here
 
         for(weight,scores) in weights:
             for url in totalscores:
@@ -66,6 +68,7 @@ class Searcher:
         return totalscores
 
     def geturlname(self, id):
+        # returns the name value of an urlid
         return self.con.execute(
                 "select url from urllist where rowid={}".format(id)).fetchone()[0]
     
@@ -76,3 +79,19 @@ class Searcher:
         for (score, urlid) in rankedscores[0:10]:
             print("{}\t{}".format(score,self.geturlname(urlid)))
 
+
+    def normalize(self, scores, smallIsBetter=False):
+        vsmall = 0.00001
+        # normalizes all scores between 0, 1 - range is dependant on smallIsBetter
+        if smallIsBetter:
+            minscore = min(scores.values())
+            return dict((u,float(minscore)/max(vsmall,l)) for (u,l) in scores.items())
+        else:
+            maxscore = max(scores.values())
+            if maxscore == 0: maxscore = vsmall
+            return dict((u,float(c)/maxscore) for (u,c) for scores.items())
+
+    def frequencyscore(self,rows):
+        counts=dict((row[0],0) for row in rows)
+        for row in rows: counts[row[0]]+=1
+        return self.normalize(counts)
