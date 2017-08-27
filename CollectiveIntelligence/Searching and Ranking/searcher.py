@@ -113,6 +113,7 @@ class Searcher:
         # each time a url appears, add 1
         for row in rows: counts[row[0]]+=1
         return self.normalize(counts)
+
     def locationscore(self, rows):
         locations = dict([(row[0],10000000) for row in rows])
         for row in rows:
@@ -120,6 +121,7 @@ class Searcher:
             # sets loc to the earliest the word occurs in the document
             if loc < locations[row[0]]: locations[row[0]]=loc
         return self.normalize(locations, smallIsBetter=True)
+
     def distancescore(self, rows):
         if len(rows[0]) <= 2: return dict([(row[0],1.0) for row in rows])
         mindistance = dict([(row[0],10000000) for row in rows])
@@ -128,3 +130,11 @@ class Searcher:
             dist=sum([abs(row[i]-row[i-1]) for i in range(2,len(row))])
             if dist<mindistance[row[0]]: mindistance[row[0]]=dist
         return self.normalize(mindistance,smallIsBetter=True)
+
+    def calculatepagerank(self, iterations=20):
+        self.con.execute('drop table if exists pagerank')
+        self.con.execute('create table pagerank(urlid primary key, score)')
+
+        self.con.execute('insert into pagerank select rowid, 1.0 from urllist')
+        self.dbcommit()
+

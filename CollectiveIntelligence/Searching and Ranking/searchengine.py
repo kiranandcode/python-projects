@@ -161,3 +161,26 @@ class crawler:
             # recurse
             pages =newpages
 
+    def calculatepagerank(self, iterations=20):
+        self.con.execute('drop table if exists pagerank')
+        self.con.execute('create table pagerank(urlid primary key, score)')
+
+        self.con.execute('insert into pagerank select rowid, 1.0 from urllist')
+        self.dbcommit()
+
+        for i in range(iterations):
+            print("Iteration {}".format(i))
+            for (urlid,) in self.con.execute('select rowid from urllist'):
+                pr=0.15
+
+                for (linker,) in self.con.execute( \
+                        'select distinct fromid from link where toid={}'.format(urlid)):
+                    linkingpr=self.con.execute(
+                            'select score from pagerank where urlid={}'.format(linker)).fetchone()[0]
+
+                    linkingcount=self.con.execute( \
+                            'select count(*) from link where fromid={}'.format(linker)).fetchone()[0]
+                    pr += 0.85*(linkingpr/linkingcount)
+                self.con.execute(
+                        'update pagerank set score={} where urlid={}'.format(pr,urlid))
+                self.dbcommit()
