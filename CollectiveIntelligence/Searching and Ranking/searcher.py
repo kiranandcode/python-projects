@@ -71,6 +71,7 @@ class Searcher:
         weights = [(1.0, self.frequencyscore(rows)),
                    (1.5, self.locationscore(rows)),
                    (1.8, self.distancescore(rows)),
+                   (1.0, self.pagerankscore(rows)),
                    (1.9, self.inboundlinkscore(rows))]
 
         # allows for prioritizing different weights by different ammounts
@@ -130,11 +131,10 @@ class Searcher:
             dist=sum([abs(row[i]-row[i-1]) for i in range(2,len(row))])
             if dist<mindistance[row[0]]: mindistance[row[0]]=dist
         return self.normalize(mindistance,smallIsBetter=True)
+    def pagerankscore(self, rows):
+        pageranks = dict([(row[0],self.con.execute('select score from pagerank where urlid={}'.format(row[0])).fetchone()[0]) for row in rows])
+        maxrank = max(pageranks.values())
+        normalizedscores = dict([(u,float(l)/maxrank) for (u,l) in pageranks.items()])
+        return normalizedscores
 
-    def calculatepagerank(self, iterations=20):
-        self.con.execute('drop table if exists pagerank')
-        self.con.execute('create table pagerank(urlid primary key, score)')
-
-        self.con.execute('insert into pagerank select rowid, 1.0 from urllist')
-        self.dbcommit()
 

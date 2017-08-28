@@ -165,19 +165,24 @@ class crawler:
         self.con.execute('drop table if exists pagerank')
         self.con.execute('create table pagerank(urlid primary key, score)')
 
+        # initialize pagerank as (urls, 1.0) for each url in urllist
         self.con.execute('insert into pagerank select rowid, 1.0 from urllist')
         self.dbcommit()
 
         for i in range(iterations):
             print("Iteration {}".format(i))
+            # for each url in pagerank
             for (urlid,) in self.con.execute('select rowid from urllist'):
                 pr=0.15
 
+                # select all unique urls pointing to the url
                 for (linker,) in self.con.execute( \
                         'select distinct fromid from link where toid={}'.format(urlid)):
+                    # get the score for the fromurl
                     linkingpr=self.con.execute(
                             'select score from pagerank where urlid={}'.format(linker)).fetchone()[0]
 
+                    # count all the links from the fromurl
                     linkingcount=self.con.execute( \
                             'select count(*) from link where fromid={}'.format(linker)).fetchone()[0]
                     pr += 0.85*(linkingpr/linkingcount)
