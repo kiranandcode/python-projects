@@ -72,6 +72,7 @@ class Searcher:
                    (1.5, self.locationscore(rows)),
                    (1.8, self.distancescore(rows)),
                    (1.0, self.pagerankscore(rows)),
+                   (1.3, self.linktextscore(rows)),
                    (1.9, self.inboundlinkscore(rows))]
 
         # allows for prioritizing different weights by different ammounts
@@ -138,3 +139,18 @@ class Searcher:
         return normalizedscores
 
 
+    def linktextscore(self, rows, wordids):
+        linkscores = dict([(row[0],0) for row in rows])
+        for wordid in wordids:
+            # get a list of tuples of all from-to links which contain the word queried for
+            cur = self.con.execute('select link.fromid,link.toid from linkwords,link where wordid={} and linkwords.linkid=link.rowid'.format(wordid))
+            for(fromid,toid) in cur:
+                # if the link points to one of our suggested links
+                if toid in linkscores:
+                    # find the pagerank of the page with the link 
+                    pr = self.con.execute('select score from pagerank where urlid={}'.format(fromid)).fetchone()[0]
+                    # accumulate it's pagerank score into the suggestion
+                    linkscores[toid] += pr
+        maxscore=max(linkscores.values)
+        normalizedscores=dict([(u,float(l)/maxscore) for (u,l) in linkscores.items()])
+        return normalizedscores
