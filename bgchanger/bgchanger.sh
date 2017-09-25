@@ -1,7 +1,8 @@
 #!/bin/bash
 
-
+CURRDIR="$(dirname "$(readlink -f "$0")")"
 export DISPLAY=0.0
-. ./bgchanger/bin/activate
+. $CURRDIR/bgchanger/bin/activate
 
-python ./bgchanger.py "$@"
+python $CURRDIR/bgchanger.py "$@"
+

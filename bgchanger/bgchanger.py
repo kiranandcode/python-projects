@@ -35,7 +35,7 @@ class ImageDict():
             self.config_dir = config_dir or os.path.expanduser("~") + "/.scripts/bgchanger/config"
             self.save_dir = save_dir or os.path.expanduser("~") + "/Pictures/"
             self.saved_list = saved_list or deque()
-            self.saved_special = {}
+            self.saved_special = set({})
         self.CreateFolders()
 
 
@@ -56,13 +56,13 @@ class ImageDict():
                 if filename not in self.saved_list:
                     self.saved_list.append(filename)
                     ## also keep track of the fact that we shouldn't delete the image
-                    self.saved_special.append(filename)
+                    self.saved_special.add(filename)
         for filename in self.saved_list:
             if not os.path.isfile(self.save_dir + filename):
                 self.saved_list.remove(filename)
                 self.saved_special.remove(filename)
 
-    def DeleteExcess(limit=100, breakout=50):
+    def DeleteExcess(self,limit=100, breakout=50):
         """
             Removes old images until the number of images is within limit
         """
@@ -94,7 +94,7 @@ class ImageDict():
                 downloaded = False
         else:
             if name:
-                print("Did not download {}, as it already exists")
+                print("Did not download {}, as it already exists".format(name))
 
         if downloaded:
             self.saved_list.append(name)
@@ -331,7 +331,8 @@ if __name__ == '__main__':
                     val = int(args[1])
                 except ValueError:
                     val = None
-                database.DeleteExcess(val)
+                with ImageDict(config_dir=configdir) as database:
+                    database.DeleteExcess(val)
         elif command == "update":
             with ImageDict(config_dir=configdir) as database:
                 database.UpdateImages()
