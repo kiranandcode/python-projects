@@ -2,7 +2,7 @@
 import os
 import praw
 import re
-import urllib.request
+from urllib import request
 import pickle
 import random
 from collections import deque
