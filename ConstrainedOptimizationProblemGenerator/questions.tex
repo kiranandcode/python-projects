@@ -1,0 +1,16 @@
+%note: to use the code listings put the following in your preamble:
+% \usepackage{xcolor}
+% \definecolor{light-gray}{gray}{0.95}
+% \newcommand{\code}[1]{\colorbox{light-gray}{\texttt{#1}}}
+\begin{itemize}
+\item{\[ \max_{x,y,z} y^2x + \frac{7z^2}{ 19 }\quad \text{subject to} \quad 6y + 9yxz\]\\ \textbf{Wolfram:} \code{ optimize ((y\^{}2)*x) + ((7*(z\^{}2)) / 19)} \newline \code{ subject to (6*y) + (9*((y*x)*z))}}
+\item{\[ \max_{x,y,z} 9z + 8yxz + \frac{xy^2}{ 19 }\quad \text{subject to} \quad 4yx^2 + 3zy\]\\ \textbf{Wolfram:} \code{ optimize ((9*z) + (8*((y*x)*z))) + ((x*(y\^{}2)) / 19)} \newline \code{ subject to (4*(y*(x\^{}2))) + (3*(z*y))}}
+\item{\[ \max_{x,y,z} x + 9x^2y\quad \text{subject to} \quad yx + y^2\]\\ \textbf{Wolfram:} \code{ optimize x + (9*((x\^{}2)*y))} \newline \code{ subject to (y*x) + (y\^{}2)}}
+\item{\[ \max_{x,y,z} x + \frac{4xy^2}{ 3 }\quad \text{subject to} \quad 8x^3 + \frac{xz}{ 9 }\]\\ \textbf{Wolfram:} \code{ optimize x + ((4*(x*(y\^{}2))) / 3)} \newline \code{ subject to (8*(x\^{}3)) + ((x*z) / 9)}}
+\item{\[ \max_{x,y,z} x^2y + z^2 + \frac{x^2z}{ 21 }\quad \text{subject to} \quad xy^2 + \frac{6xz}{ 24 }\]\\ \textbf{Wolfram:} \code{ optimize (((x\^{}2)*y) + (z\^{}2)) + (((x\^{}2)*z) / 21)} \newline \code{ subject to (x*(y\^{}2)) + ((6*(x*z)) / 24)}}
+\item{\[ \max_{x,y,z} \frac{x}{ 3 } + 5y^2z + 6xz^2\quad \text{subject to} \quad 9z + 2x\]\\ \textbf{Wolfram:} \code{ optimize ((x / 3) + (5*((y\^{}2)*z))) + (6*(x*(z\^{}2)))} \newline \code{ subject to (9*z) + (2*x)}}
+\item{\[ \max_{x,y,z} \frac{4yx^2}{ 13 } + 6z^2y + 3zx\quad \text{subject to} \quad zx^2 + z + z\]\\ \textbf{Wolfram:} \code{ optimize (((4*(y*(x\^{}2))) / 13) + (6*((z\^{}2)*y))) + (3*(z*x))} \newline \code{ subject to ((z*(x\^{}2)) + z) + z}}
+\item{\[ \max_{x,y,z} 5x + yx + x^2\quad \text{subject to} \quad 7x + \frac{x^2}{ 15 } + xy\]\\ \textbf{Wolfram:} \code{ optimize ((5*x) + (y*x)) + (x\^{}2)} \newline \code{ subject to ((7*x) + ((x\^{}2) / 15)) + (x*y)}}
+\item{\[ \max_{x,y,z} z + zy + \frac{6x^2y}{ 13 }\quad \text{subject to} \quad 4xz^2 + z^3\]\\ \textbf{Wolfram:} \code{ optimize (z + (z*y)) + ((6*((x\^{}2)*y)) / 13)} \newline \code{ subject to (4*(x*(z\^{}2))) + (z\^{}3)}}
+\item{\[ \max_{x,y,z} y^2x + 7x^2 + xy\quad \text{subject to} \quad yx + y\]\\ \textbf{Wolfram:} \code{ optimize (((y\^{}2)*x) + (7*(x\^{}2))) + (x*y)} \newline \code{ subject to (y*x) + y}}
+\end{itemize}
