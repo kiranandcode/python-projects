@@ -9,6 +9,8 @@ Me too.
 
 Anyway, the output looks like:
 
-
+![Output Format][screenshot]
 
 (Not bad eh?)
+
+[screenshot]: https://raw.githubusercontent.com/Gopiandcode/python-projects/master/ConstrainedOptimizationProblemGenerator/optimized_solver_example.png "Looking sweet"
