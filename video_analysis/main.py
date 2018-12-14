@@ -3,7 +3,7 @@ import sys
 from common import draw_str
 from detectors import *
 from executor import VisualExecutor
-from visualizer import LKFlowVisualizer
+from visualizer import LKFlowVisualizer, FarnebackFlowVisualizer
 
 lk_params = {
     'winSize': (15, 15),
@@ -38,7 +38,7 @@ feature_params = {
 #         break
 
 # When everything done, release the capture
-VisualExecutor(sys.argv[1], visualizers=[LKFlowVisualizer()], scene_detectors=[LKFlowSceneDetector()]).run()
+VisualExecutor(sys.argv[1], visualizers=[FarnebackFlowVisualizer(),  LKFlowVisualizer()], scene_detectors=[LKFlowSceneDetector()]).run()
 
 # cap.release()
 cv2.destroyAllWindows()

@@ -10,7 +10,20 @@ default_lk_params = {
     'criteria': (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03),
 }
 
+default_f_params = {
+    'winSize': (15, 15),
+    'maxLevel': 2,
+    'criteria': (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03),
+}
+
 default_feature_params = {
+    'maxCorners': 500,
+    'qualityLevel': 0.3,
+    'minDistance': 7,
+    'blockSize': 7
+}
+
+default_f_feature_params = {
     'maxCorners': 500,
     'qualityLevel': 0.3,
     'minDistance': 7,
@@ -127,3 +140,29 @@ class LKFlowVisualizer(Visualizer):
 
 
         self.prev_gray = frame_gray
+
+
+
+
+class FarnebackFlowVisualizer(Visualizer):
+    def __init__(self):
+        self.prvs = None
+        self.hsv = None
+
+
+    def process_frame(self, frame_num, frame, vis):
+        if self.prvs is None or self.hsv is None:
+            self.prvs = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
+            self.hsv = np.zeros_like(frame)
+            self.hsv[...,1] = 255
+
+        next = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
+        flow = cv2.calcOpticalFlowFarneback(self.prvs,next, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+        mag, ang = cv2.cartToPolar(flow[...,0], flow[...,1])
+        self.hsv[...,0] = ang*180/np.pi/2
+        self.hsv[...,2] = cv2.normalize(mag,None,0,255,cv2.NORM_MINMAX)
+        self.prvs = next
+        bgr = cv2.cvtColor(self.hsv,cv2.COLOR_HSV2BGR)
+        cv2.add(vis, bgr, vis)
+
+
