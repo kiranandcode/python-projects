@@ -38,7 +38,7 @@ feature_params = {
 #         break
 
 # When everything done, release the capture
-VisualExecutor(sys.argv[1], visualizers=[StructuralDifferenceVisualizer()], scene_detectors=[LKFlowSceneDetector()]).run()
+VisualExecutor(sys.argv[1], visualizers=[AverageIntensityVisualizer()], scene_detectors=[AverageIntensityDifferenceDetector()]).run()
 
 # cap.release()
 cv2.destroyAllWindows()

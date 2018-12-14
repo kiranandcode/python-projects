@@ -1,4 +1,6 @@
 import abc
+from typing import Optional
+
 import numpy as np
 
 import cv2
@@ -19,7 +21,7 @@ default_feature_params = {
 
 class SceneDetector(abc.ABC):
     @abc.abstractmethod
-    def process_frame(self, frame_num, frame) -> float:
+    def process_frame(self, frame_num, frame) -> Optional[float]:
         """
         Determines whether a given video should be cut at a given frame or not,
         by accumulating information about the previous frames up to this point.
@@ -59,7 +61,7 @@ class LKFlowSceneDetector(SceneDetector):
     def calculate_scene_probability(self) -> float:
         return float(len(self.old_tracks) > 2 and len(self.tracks) < 1)
 
-    def process_frame(self, frame_num, frame) -> float:
+    def process_frame(self, frame_num, frame) -> Optional[float]:
 
         # convert it to grayscale for processing
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -127,3 +129,56 @@ class LKFlowSceneDetector(SceneDetector):
     def video_cut(self, frame_num):
         self.old_tracks = []
         self.tracks = []
+
+
+class AverageIntensityChangeDetector(SceneDetector):
+    def __init__(self, threshhold=15):
+        self.last_mean = None
+        self.threshhold = threshhold
+
+    def video_cut(self, frame_num):
+        self.last_mean = None
+
+    def process_frame(self, frame_num, frame) -> Optional[float]:
+        current_mean = frame.mean()
+
+        if self.last_mean is None:
+            self.last_mean = current_mean
+            return None
+
+        score = None
+
+        if self.last_mean < self.threshhold and current_mean >= self.threshhold:
+            score = 1.0
+        elif  self.last_mean >= self.threshhold and current_mean < self.threshhold:
+            score = 1.0
+
+        self.last_mean = current_mean
+
+        return score
+
+
+class AverageIntensityDifferenceDetector(SceneDetector):
+    def __init__(self, threshhold=5.0):
+        self.last_mean = None
+        self.threshhold = threshhold
+
+    def video_cut(self, frame_num):
+        self.last_mean = self.last_mean
+
+    def process_frame(self, frame_num, frame) -> Optional[float]:
+        current_mean = frame.mean()
+
+        if self.last_mean is None:
+            self.last_mean = current_mean
+            return None
+
+        score = 0.0
+
+        if abs(self.last_mean - current_mean) > self.threshhold:
+            score = 1.0
+
+        self.last_mean = current_mean
+
+        return score
+

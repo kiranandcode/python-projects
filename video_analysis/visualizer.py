@@ -196,3 +196,21 @@ class StructuralDifferenceVisualizer(Visualizer):
             cv2.rectangle(vis, (x,y), (x+w,y+h), (0,0,255),2)
 
         self.prev_frame = frame
+
+class AverageIntensityVisualizer(Visualizer):
+
+    def __init__(self):
+        self.last_mean = None
+
+
+    def process_frame(self, frame_num, frame, vis):
+        current_mean = frame.mean()
+
+        if self.last_mean is None:
+            self.last_mean = current_mean
+            return None
+
+        draw_str(vis, (20,80), "last mean: %f, current_mean: %f, diff: %f" %
+                 (self.last_mean, current_mean, abs(self.last_mean - current_mean)))
+
+        self.last_mean = current_mean

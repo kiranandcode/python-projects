@@ -44,6 +44,10 @@ class VisualExecutor:
             # Load the image data from the video stream
             _ret, frame = self.vid.read()
 
+            # end of frame
+            if not _ret:
+                break
+
             # keep a full-colour copy for rendering
             vis = frame.copy()
 
@@ -57,12 +61,13 @@ class VisualExecutor:
                 score = scene_detector.process_frame(self.frame_idx, frame)
                 scores.append(score)
 
+            not_none_scores = [x for x in scores if x is not None]
             if self.score_evaluator is None:
-                if len(scores) > 0:
-                    normalized = sum(scores) / len(scores)
+                if len(not_none_scores) > 0:
+                    normalized = sum(not_none_scores) / len(not_none_scores)
                     self.new_scene = normalized > 0.5
             else:
-                if len(scores) > 0:
+                if len(not_none_scores) > 0:
                     self.new_scene = self.score_evaluator(scores)
 
 
