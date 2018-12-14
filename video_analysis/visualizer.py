@@ -1,4 +1,6 @@
 import abc
+from skimage.measure import compare_ssim
+import imutils
 import numpy as np
 from common import draw_str
 
@@ -166,3 +168,31 @@ class FarnebackFlowVisualizer(Visualizer):
         cv2.add(vis, bgr, vis)
 
 
+class StructuralDifferenceVisualizer(Visualizer):
+    def __init__(self):
+        self.prev_gray = None
+        pass
+
+    def process_frame(self, frame_num, frame, vis):
+
+        frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        if self.prev_gray is None:
+            self.prev_gray = frame_gray
+            return
+
+        (score,diff) = compare_ssim(frame_gray, self.prev_gray, full=True)
+
+        # convert the diff to uint
+        diff = (diff * 255).astype("uint8")
+
+        # calculate the threshhold
+        thresh = cv2.threshold(diff, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
+        cnts = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cnts = imutils.grab_contours(cnts)
+
+        for c in cnts:
+            (x,y,w,h) = cv2.boundingRect(c)
+            cv2.rectangle(vis, (x,y), (x+w,y+h), (0,0,255),2)
+
+        self.prev_frame = frame
