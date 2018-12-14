@@ -1,5 +1,6 @@
 import abc
 import numpy as np
+from common import draw_str
 
 import cv2
 
@@ -17,30 +18,14 @@ default_feature_params = {
 }
 
 
-class SceneDetector(abc.ABC):
+class Visualizer(abc.ABC):
     @abc.abstractmethod
-    def process_frame(self, frame_num, frame) -> float:
-        """
-        Determines whether a given video should be cut at a given frame or not,
-        by accumulating information about the previous frames up to this point.
-        :param frame_num:  the frame number
-        :param frame:  the frame object
-        :return: (0-1) - the confidence to which this analyser believes the frame should be cut here
-        """
-        pass
-
-    @abc.abstractmethod
-    def video_cut(self, frame_num):
-        """
-        Informs the algorithm that the video was cut at this point - if using multiple detectors,
-        a different algorithm may have overridden the decision of this one
-        :param frame_num: the frame number at which the cut is made
-        """
+    def process_frame(self, frame_num, frame, vis):
         pass
 
 
-class LKFlowSceneDetector(SceneDetector):
 
+class LKFlowVisualizer(Visualizer):
     def __init__(self, detect_interval=5, track_len=10, lk_params=None, feature_params=None):
         if feature_params is None:
             feature_params = dict()
@@ -48,21 +33,19 @@ class LKFlowSceneDetector(SceneDetector):
             lk_params = dict()
         self.track_len = track_len
 
-        self.old_tracks = []
         self.tracks = []
         self.prev_gray = None
         self.detect_interval = detect_interval
 
-        self.lk_params = {**default_lk_params, **lk_params}
-        self.feature_params = {**default_feature_params, **feature_params}
+        self.lk_params = {  **default_lk_params, **lk_params }
+        self.feature_params = { **default_feature_params, **feature_params}
 
-    def calculate_scene_probability(self) -> float:
-        return float(len(self.old_tracks) > 2 and len(self.tracks) < 1)
 
-    def process_frame(self, frame_num, frame) -> float:
+    def process_frame(self, frame_num, frame, vis):
 
         # convert it to grayscale for processing
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
 
         # if there are things we are currently tracking
         if len(self.tracks) > 0:
@@ -99,9 +82,30 @@ class LKFlowSceneDetector(SceneDetector):
                 # add the corresponding elongated track to the new tracks list
                 new_tracks.append(tr)
 
-            self.old_tracks = self.tracks
+                # add a circle at the new point location
+                cv2.circle(vis, (x, y), 2, (0, 255, 0), -1)
+
+
             # update the tracks to point to the new list of tracks
             self.tracks = new_tracks
+
+            avg = 0
+            count = 0
+            for track in self.tracks:
+                # calculate the frequency of the sequence of points
+                freq = 1
+
+                avg = avg * count
+                count += 1
+                avg += freq
+                avg /= count
+
+
+            # draw lines between the previous points for all tracked points
+            cv2.polylines(vis, [np.int32(tr) for tr in self.tracks], False, (0, 255, 0))
+
+            # draw a debug string to the page
+            draw_str(vis, (20, 20), 'track count: %d, d: %d, p0-pr: %s' % (len(self.tracks), d.sum(), str((p0 - p0r).mean())))
 
         # if it's a sample interval
         if frame_num % self.detect_interval == 0:
@@ -121,9 +125,5 @@ class LKFlowSceneDetector(SceneDetector):
                 for x, y in np.float32(p).reshape(-1, 2):
                     self.tracks.append([(x, y)])
 
-        self.prev_gray = frame_gray
-        return self.calculate_scene_probability()
 
-    def video_cut(self, frame_num):
-        self.old_tracks = []
-        self.tracks = []
+        self.prev_gray = frame_gray
