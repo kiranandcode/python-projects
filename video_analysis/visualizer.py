@@ -214,3 +214,70 @@ class AverageIntensityVisualizer(Visualizer):
                  (self.last_mean, current_mean, abs(self.last_mean - current_mean)))
 
         self.last_mean = current_mean
+
+
+class ColourAverageIntensityDifferenceVisualiser(Visualizer):
+    def __init__(self, r_threshold=0.8, g_threshold=0.8, b_threshold=0.8, manual_threshold=None):
+        self.manual_threshold = manual_threshold
+        self.b_threshold = b_threshold
+        self.g_threshold = g_threshold
+        self.r_threshold = r_threshold
+        self.last_b = None
+        self.last_g = None
+        self.last_r = None
+
+
+    def process_frame(self, frame_num, frame, vis):
+        b, g, r = cv2.split(frame)
+
+        current_b = b.mean()
+        current_g = g.mean()
+        current_r = r.mean()
+
+        if self.last_b is None or self.last_g is None or self.last_r is None:
+            self.last_b = current_b
+            self.last_g = current_g
+            self.last_r = current_r
+            return None
+
+        score = 0.0
+
+        proportion_b = None
+        proportion_g =  None
+        proportion_r =  None
+
+        if self.last_b < 1:
+            proportion_b =  (current_b - self.last_b)
+        else:
+            proportion_b =  (current_b - self.last_b)/self.last_b
+
+        if self.last_g < 1:
+            proportion_g =  (current_g - self.last_g)
+        else:
+            proportion_g =  (current_g - self.last_g)/self.last_g
+
+
+        if self.last_r < 1:
+            proportion_r =  (current_r - self.last_r)
+        else:
+            proportion_r =  (current_r - self.last_r)/self.last_r
+
+
+        if self.manual_threshold is None:
+            if abs(proportion_b) > self.b_threshold:
+                score += 0.33
+            if abs(proportion_g) > self.g_threshold:
+                score += 0.33
+            if abs(proportion_r) > self.r_threshold:
+                score += 0.33
+        else:
+            score = self.manual_threshold(proportion_b, proportion_g, proportion_r)
+
+        self.last_b = current_b
+        self.last_g = current_g
+        self.last_r = current_r
+
+        draw_str(vis, (20,100), "(r,g,b): (%f,%f,%f), score: %f" % (proportion_r, proportion_g, proportion_b, score))
+
+
+

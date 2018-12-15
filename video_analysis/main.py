@@ -38,7 +38,15 @@ feature_params = {
 #         break
 
 # When everything done, release the capture
-VisualExecutor(sys.argv[1], visualizers=[AverageIntensityVisualizer()], scene_detectors=[AverageIntensityDifferenceDetector()]).run()
+VisualExecutor(sys.argv[1], visualizers=[
+    ColourAverageIntensityDifferenceVisualiser(
+        r_threshold=0.05,
+        g_threshold=0.05,
+        b_threshold=0.05,
+    )
+], scene_detectors=[
+
+]).run()
 
 # cap.release()
 cv2.destroyAllWindows()
