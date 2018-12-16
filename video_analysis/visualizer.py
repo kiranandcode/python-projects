@@ -280,4 +280,49 @@ class ColourAverageIntensityDifferenceVisualiser(Visualizer):
         draw_str(vis, (20,100), "(r,g,b): (%f,%f,%f), score: %f" % (proportion_r, proportion_g, proportion_b, score))
 
 
+class ColourAverageIntensityDifferenceVisualiser(Visualizer):
+    def __init__(self, r_threshold=0.8, g_threshold=0.8, b_threshold=0.8, manual_threshold=None, alpha_r=0.8,
+                 alpha_g=0.8, alpha_b=0.8):
+        self.manual_threshold = manual_threshold
+        self.b_threshold = b_threshold
+        self.g_threshold = g_threshold
+        self.r_threshold = r_threshold
+        self.alpha_r = alpha_r
+        self.alpha_g = alpha_g
+        self.alpha_b = alpha_b
+        self.count = 0
+        self.mu_r = None
+        self.mu_g = None
+        self.mu_b = None
+        self.var_r = None
+        self.var_g = None
+        self.var_b = None
+
+
+    def process_frame(self, frame_num, frame, vis):
+        b, g, r = cv2.split(frame)
+
+        current_b = b.mean()
+        current_g = g.mean()
+        current_r = r.mean()
+        score = 0.0
+
+        if self.count == 0:
+            self.mu_r = current_r
+            self.mu_g = current_g
+            self.mu_b = current_b
+            self.var_r = 0
+            self.var_g = 0
+            self.var_b = 0
+        else:
+            self.mu_r = ((self.mu_r * self.count) + current_r)/(self.count + 1)
+            self.mu_g = ((self.mu_g * self.count) + current_g)/(self.count + 1)
+            self.mu_b = ((self.mu_b * self.count) + current_b)/(self.count + 1)
+            self.var_r =  (self.alpha_r) *  self.var_r + (1 - self.alpha_r) * (self.mu_r - current_r)^2
+            self.var_g =  (self.alpha_g) *  self.var_g + (1 - self.alpha_g) * (self.mu_g - current_g)^2
+            self.var_b =  (self.alpha_b) *  self.var_b + (1 - self.alpha_b) * (self.mu_b - current_b)^2
+
+        draw_str(vis, (20,100), "" % ())
+
+
 
