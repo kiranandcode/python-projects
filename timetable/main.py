@@ -1,11 +1,29 @@
 import tkinter as tk
 from datetime import timedelta, time, datetime
+from itertools import cycle
 from typing import List, Tuple
 import matplotlib
 import matplotlib.dates as mdates
 import random
 
 #
+grid_colours = [
+    '#%02x%02x%02x' % (0x1C, 0x77, 0xC3),
+    '#%02x%02x%02x' % (0x39, 0xA9, 0xDB),
+    '#%02x%02x%02x' % (0x40, 0xBC, 0xD8),
+    '#%02x%02x%02x' % (0xE3, 0x92, 0x37),
+    '#%02x%02x%02x' % (0xD6, 0x32, 0x30),
+    '#%02x%02x%02x' % (0x1D, 0xD3, 0xB0),
+    '#%02x%02x%02x' % (0xAF, 0xFC, 0x41),
+    '#%02x%02x%02x' % (0xB2, 0xfF, 0x9E),
+    '#%02x%02x%02x' % (0x6D, 0x72, 0xC3),
+    "red",
+    "green",
+    "blue",
+    "cyan",
+    "yellow",
+    "magenta"
+]
 
 matplotlib.use('TkAgg')
 
@@ -23,18 +41,20 @@ class TimetablePlanner:
 
         # construct the task manager
         self.task_frame = tk.LabelFrame(self.master, text="Tasks")
-        self.task_frame.grid(column=0, row=0, rowspan=3, columnspan=1, sticky=tk.W, padx=3, pady=3)
+        self.task_frame.grid(column=0, row=0, rowspan=3, columnspan=1,  padx=3, pady=3, sticky=tk.N + tk.S + tk.W + tk.E)
+        self.task_frame.columnconfigure(1, weight=1)
         self.task_manager = TaskManager(self.task_frame, on_tasks_changed=self.on_tasks_changed)
 
         # construct the time manager
         self.time_frame = tk.LabelFrame(self.master, text="Schedule")
-        self.time_frame.grid(column=0, row=3, columnspan=4, rowspan=1)
+        self.time_frame.grid(column=0, row=3, columnspan=4, rowspan=1, sticky=tk.N + tk.S + tk.W + tk.E)
         self.time_manager = TimeManager(self.time_frame, on_schedule_changed=self.on_schedule_changed)
 
         # construct the table manager
         self.table_frame = tk.LabelFrame(self.master, text="Timetable")
-        self.table_frame.grid(column=1, row=0, rowspan=3, columnspan=3)
+        self.table_frame.grid(column=1, row=0, rowspan=3, columnspan=3, sticky=tk.N + tk.S + tk.W + tk.E)
         self.table_manager = TableManager(self.table_frame)
+
 
     def on_tasks_changed(self, tasks):
         self.table_manager.set_tasks(tasks)
@@ -79,6 +99,10 @@ class TableManager:
         self.task_choices = set(task[0] for task in self.tasks)
         self.task_choices.add( 'None')
 
+        self.colouring = dict(zip(sorted(task[0] for task in self.tasks), cycle(grid_colours)))
+        self.colouring["None"] = "#A4A9AD"
+
+        self.old_grid = self.grid
         self.grid = [[None for i in range(self.no_days)] for i in range(len(self.work_intervals))]
 
         self.construct_grid()
@@ -102,10 +126,40 @@ class TableManager:
             for j in range(len(self.days)):
                 grid_i = i+1
                 grid_j = j+1
+                value = "None"
+
+                if self.old_grid is not None:
+                    if i < len(self.old_grid):
+                        if j < len(self.old_grid[i]):
+                            if self.old_grid[i][j] is not None:
+                                old_value = self.old_grid[i][j][1].get()
+                                if old_value in self.task_choices:
+                                    value = old_value
+
+
                 namevar = tk.StringVar()
-                namevar.set("None")
-                self.grid[i][j] = (tk.OptionMenu(self.grid_panel, namevar, *self.task_choices),namevar)
-                self.grid[i][j][0].grid(row=grid_i, column=grid_j, columnspan=1, rowspan=1)
+                namevar.set(value)
+                namevar.trace_add("write", lambda *args,i=i,j=j: self.grid_box_change(i,j))
+                print(self.colouring)
+                color = self.colouring[value]
+                print(self.colouring[value])
+                option_menu = tk.OptionMenu(self.grid_panel, namevar,
+                                            command=lambda colour=color, i=i,j=j: self.grid_box_change(i,j,colour),
+                                            *self.task_choices)
+                self.grid[i][j] = (option_menu,namevar)
+                self.grid[i][j][0].configure(bg=color)
+                self.grid[i][j][0].grid(row=grid_i, column=grid_j, columnspan=1, rowspan=1, stick=tk.N + tk.S + tk.E + tk.W)
+        self.old_grid = None
+
+    def grid_box_change(self, i,j, colour=None):
+        if colour is None:
+            colour = self.grid[i][j][1].get()
+        value = self.colouring["None"]
+
+        if colour in self.colouring:
+            value = self.colouring[colour]
+
+        self.grid[i][j][0].configure(bg=value)
 
 
 
@@ -170,10 +224,8 @@ class TableManager:
             for task in choices_to_allocate:
                 assigned_count[task] += 1
 
-            print(len(choices_to_allocate),len(self.work_intervals))
             random.shuffle(choices_to_allocate)
             for j,task in zip(range(len(self.work_intervals)), choices_to_allocate):
-                print("Setting ", self.work_intervals[j], " on ", self.days[i] , " to ", task)
                 wdgt = self.grid[j][i][1]
                 wdgt.set(task)
 
@@ -346,6 +398,8 @@ class TimeManager:
         self.create_break_button = tk.Button(self.create_break_frame, text="Add Break",
                                              command=self.create_break_callback, state=tk.DISABLED)
         self.create_break_button.pack(side=tk.LEFT, expand=True, fill=tk.X)
+        self.create_break_entry.bind("<Return>", lambda x: self.create_break_callback())
+        self.create_break_button.bind("<Return>", lambda x: self.create_break_callback())
 
     def create_break_edit_callback(self, *args):
         break_duration = self.create_break_value.get()
@@ -378,6 +432,7 @@ class TimeManager:
         self.update_break_entry = tk.Entry(self.update_break_frame, textvariable=self.update_break_value,
                                            state=tk.DISABLED)
         self.update_break_entry.pack(fill=tk.X)
+        self.update_break_entry.bind("<Return>", lambda x: self.update_break_update_callback())
 
         self.update_break_panel = tk.Frame(self.update_break_frame)
         self.update_break_panel.pack(fill=tk.X, expand=True)
@@ -385,10 +440,12 @@ class TimeManager:
         self.update_break_update_button = tk.Button(self.update_break_panel, text="Update Break", state=tk.DISABLED,
                                                     command=self.update_break_update_callback)
         self.update_break_update_button.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.update_break_update_button.bind("<Return>", lambda x: self.update_break_update_callback())
 
         self.update_break_remove_button = tk.Button(self.update_break_panel, text="Delete Break", state=tk.DISABLED,
                                                     command=self.update_break_delete_callback)
         self.update_break_remove_button.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.update_break_remove_button.bind("<Return>", lambda x: self.update_break_delete_callback())
 
     def update_break_edit_callback(self, *args):
         self.update_modify_components_state()
@@ -473,18 +530,18 @@ class TimeManager:
 
     def configure_schedule_visualization(self, master):
         self.schedule_graph = tk.LabelFrame(master, text="Schedule Visualization")
-        self.schedule_graph.pack(side=tk.LEFT, expand=True, fill=tk.X)
+        self.schedule_graph.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
 
-        self.schedule_figure = Figure(figsize=(5, 4), dpi=100)
+        self.schedule_figure = Figure(figsize=(5, 4), dpi=100,tight_layout=True)
         self.schedule_axes = self.schedule_figure.add_axes([0.1, 0.1, 0.8, 0.8])
         self.schedule_date_plotter = mdates.DateFormatter('%H:%M')
 
         self.schedule_canvas = FigureCanvasTkAgg(self.schedule_figure, master=self.schedule_graph)
         self.schedule_canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        self.schedule_canvas._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
         self.schedule_toolbar = NavigationToolbar2Tk(self.schedule_canvas, self.schedule_graph)
         self.schedule_toolbar.update()
-        self.schedule_canvas._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
         def on_key_event(event):
             key_press_handler(event, self.schedule_canvas, self.schedule_toolbar)
@@ -531,6 +588,7 @@ class TimeManager:
         self.work_length_duration_entry = \
             tk.Entry(self.work_length_panel, textvariable=self.work_length_duration_value)
         self.work_length_duration_entry.pack(side=tk.LEFT)
+        self.work_length_duration_entry.bind("<Return>", lambda x: self.work_length_duration_update_callback())
 
         self.work_length_duration_update_button = \
             tk.Button(self.work_length_panel,
@@ -538,6 +596,7 @@ class TimeManager:
                       command=self.work_length_duration_update_callback,
                       state=tk.DISABLED)
         self.work_length_duration_update_button.pack(side=tk.LEFT)
+        self.work_length_duration_update_button.bind("<Return>", lambda x: self.work_length_duration_update_callback())
 
         self.work_length_duration_reset_button = \
             tk.Button(self.work_length_panel,
@@ -545,6 +604,7 @@ class TimeManager:
                       command=self.work_length_duration_reset_callback,
                       state=tk.DISABLED)
         self.work_length_duration_reset_button.pack(side=tk.LEFT)
+        self.work_length_duration_reset_button.bind("<Return>", lambda x: self.work_length_duration_reset_callback())
 
     def work_length_duration_callback(self, *args):
         duration = self.work_length_duration_value.get()
@@ -584,6 +644,7 @@ class TimeManager:
         self.start_time_entry = \
             tk.Entry(self.start_time_panel, textvariable=self.start_time_value)
         self.start_time_entry.pack(side=tk.LEFT, expand=True, fill=tk.X)
+        self.start_time_entry.bind("<Return>", lambda x: self.start_time_update_callback())
 
         self.start_time_update_button = \
             tk.Button(self.start_time_panel,
@@ -591,6 +652,7 @@ class TimeManager:
                       command=self.start_time_update_callback,
                       state=tk.DISABLED)
         self.start_time_update_button.pack(side=tk.LEFT, expand=True, fill=tk.X)
+        self.start_time_update_button.bind("<Return>", lambda x: self.start_time_update_callback())
 
         self.start_time_reset_button = \
             tk.Button(self.start_time_panel,
@@ -598,6 +660,7 @@ class TimeManager:
                       command=self.start_time_reset_callback,
                       state=tk.DISABLED)
         self.start_time_reset_button.pack(side=tk.LEFT, expand=True, fill=tk.X)
+        self.start_time_reset_button.bind("<Return>", lambda x: self.start_time_reset_callback())
 
     def start_time_callback(self, *args):
         time_value = self.start_time_value.get()
@@ -661,6 +724,8 @@ class TaskManager:
             state=tk.DISABLED
         )
         self.modify_name.pack(side=tk.LEFT)
+        self.modify_name.bind("<Return>", lambda x: self.modify_update_callback())
+
         tk.Label(self.modify_entries, text="Weight:").pack(side=tk.LEFT, padx=2)
         self.modify_score = tk.Entry(
             self.modify_entries,
@@ -668,6 +733,8 @@ class TaskManager:
             state=tk.DISABLED
         )
         self.modify_score.pack(side=tk.LEFT)
+        self.modify_score.bind("<Return>", lambda x: self.modify_update_callback())
+
         self.modify_name_value.trace_add("write", self.modify_name_callback)
         self.modify_score_value.trace_add("write", self.modify_score_callback)
 
@@ -678,6 +745,8 @@ class TaskManager:
             command=self.modify_update_callback
         )
         self.modify_update_button.pack(fill=tk.X, pady=2)
+        self.modify_update_button.bind("<Return>", lambda x: self.modify_update_callback())
+
         self.modify_delete_button = tk.Button(
             self.modify_entries_parent,
             text="Delete Task",
@@ -685,6 +754,7 @@ class TaskManager:
             command=self.modify_delete_callback
         )
         self.modify_delete_button.pack(fill=tk.X, pady=2)
+        self.modify_delete_button.bind("<Return>", lambda x: self.modify_delete_callback())
 
         self.create_entries_parent = tk.LabelFrame(self.master, text="Create Task", relief='flat')
         self.create_entries_parent.pack(fill=tk.X, **self.padding_options)
@@ -695,11 +765,13 @@ class TaskManager:
         self.create_name_value = tk.StringVar()
         self.create_name = tk.Entry(self.create_entries, textvariable=self.create_name_value)
         self.create_name.pack(side=tk.LEFT)
+        self.create_name.bind("<Return>", lambda x: self.create_task_callback())
 
         tk.Label(self.create_entries, text="Weight:").pack(side=tk.LEFT, padx=2)
         self.create_score_value = tk.StringVar()
         self.create_score = tk.Entry(self.create_entries, textvariable=self.create_score_value)
         self.create_score.pack(side=tk.LEFT)
+        self.create_score.bind("<Return>", lambda x: self.create_task_callback())
 
         self.create_name_value.trace_add("write", self.create_name_callback)
         self.create_score_value.trace_add("write", self.create_score_callback)
@@ -711,6 +783,7 @@ class TaskManager:
             command=self.create_task_callback
         )
         self.create_button.pack(fill=tk.X, pady=2)
+        self.create_button.bind("<Return>", lambda x: self.create_task_callback())
 
     def modify_delete_callback(self):
         if self.modify_index is not None:
