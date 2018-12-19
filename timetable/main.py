@@ -1,10 +1,13 @@
 import tkinter as tk
+from tkinter import filedialog
 from datetime import timedelta, time, datetime
 from itertools import cycle
 from typing import List, Tuple
 import matplotlib
 import matplotlib.dates as mdates
 import random
+import sys
+import json
 
 #
 grid_colours = [
@@ -35,13 +38,37 @@ from matplotlib.figure import Figure
 from timeparser import *
 
 
+class StatsManager(object):
+
+    def __init__(self, master):
+        self.master = master
+        self.stats_text = tk.Text(self.master, state=tk.DISABLED)
+        self.stats_text.pack(fill=tk.BOTH, expand=True)
+
+        self.set_text("None")
+
+    def clear_text_area(self):
+        self.stats_text.configure(state=tk.NORMAL)
+        self.stats_text.delete('1.0', tk.END)
+        self.stats_text.configure(state=tk.DISABLED)
+
+    def set_text(self, text):
+        self.clear_text_area()
+        self.stats_text.configure(state=tk.NORMAL)
+        self.stats_text.insert(tk.END, text)
+        self.stats_text.configure(state=tk.DISABLED)
+
+
 class TimetablePlanner:
     def __init__(self, master):
         self.master = master
+        self.stats_manager = None
+
+        self.configure_menu()
 
         # construct the task manager
         self.task_frame = tk.LabelFrame(self.master, text="Tasks")
-        self.task_frame.grid(column=0, row=0, rowspan=3, columnspan=1,  padx=3, pady=3, sticky=tk.N + tk.S + tk.W + tk.E)
+        self.task_frame.grid(column=0, row=0, rowspan=3, columnspan=1, padx=3, pady=3, sticky=tk.N + tk.S + tk.W + tk.E)
         self.task_frame.columnconfigure(1, weight=1)
         self.task_manager = TaskManager(self.task_frame, on_tasks_changed=self.on_tasks_changed)
 
@@ -53,35 +80,207 @@ class TimetablePlanner:
         # construct the table manager
         self.table_frame = tk.LabelFrame(self.master, text="Timetable")
         self.table_frame.grid(column=1, row=0, rowspan=3, columnspan=3, sticky=tk.N + tk.S + tk.W + tk.E)
-        self.table_manager = TableManager(self.table_frame)
+        self.table_manager = TableManager(self.table_frame, on_stats_change=self.on_table_stats_change)
 
+        self.stats_panel = tk.LabelFrame(self.master, text="Statistics")
+        self.stats_panel.grid(column=4, row=0, columnspan=1, rowspan=4, sticky=tk.N + tk.S + tk.W + tk.E)
+        self.stats_manager = StatsManager(self.stats_panel)
+
+    def configure_menu(self):
+        self.menubar = tk.Menu(self.master)
+        self.master.config(menu=self.menubar)
+
+        self.file_menu = tk.Menu(self.menubar)
+        self.file_menu.add_command(label="Save", command=self.on_save)
+        self.file_menu.add_command(label="Load", command=self.on_load)
+        self.file_menu.add_command(label="Exit", command=self.on_exit)
+        self.menubar.add_cascade(label="File", menu=self.file_menu)
+
+        self.export_menu = tk.Menu(self.menubar)
+        self.export_menu.add_command(label="Export", command=self.on_export)
+        self.menubar.add_cascade(label="Export", menu=self.export_menu)
+
+        self.about_menu = tk.Menu(self.menubar)
+        self.about_menu.add_command(label="About", command=self.about)
+        self.menubar.add_cascade(label="About", menu=self.about_menu)
+
+    def show_dialog_box(self, text):
+        window = tk.Toplevel(self.master)
+        tk.Label(window, text=text).pack(padx=5, pady=5)
+
+        def on_delete():
+            window.destroy()
+
+        tk.Button(window, text="Ok", command=on_delete).pack(padx=5, pady=5)
+
+    def about(self):
+        window = tk.Toplevel(self.master)
+        tk.Label(window, text="About Goptable").pack(padx=5, pady=5)
+        tk.Label(window, text="By Gopiandcode").pack(padx=5, pady=5)
+
+        def on_delete():
+            window.destroy()
+
+        tk.Button(window, text="Ok", command=on_delete).pack(padx=5, pady=5)
+
+    def on_exit(self):
+        sys.exit()
+
+    def on_save(self):
+        # retrieve the state object
+        encoded = {}
+
+        encoded['tasks'] = list(self.task_manager.tasks)
+
+        encoded['breaks'] = [timedelta_to_str(br) for br in self.time_manager.break_durations]
+        encoded['work_interval'] = timedelta_to_str(self.time_manager.work_length)
+        encoded['start_time'] = time.strftime(self.time_manager.start_time, "%H:%M")
+
+        encoded['start_date'] = datetime.strftime(self.table_manager.start_date, "%d-%m-%Y")
+        encoded['days'] = self.table_manager.no_days
+
+        grid = []
+        for row in self.table_manager.grid:
+            values = []
+            for (option, val) in row:
+                values.append(val.get())
+            grid.append(values)
+
+        encoded['table'] = grid
+
+        encoded = json.dumps(encoded)
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            title="Save timetable file as",
+            filetypes=[("json", "*.json")],
+            parent=self.master
+        )
+        if file_path is not None:
+            with open(file_path, "w") as f:
+                f.write(encoded)
+
+    def on_load(self):
+        file_path = filedialog.askopenfilename(
+            #            defaultextension=".json",
+            title="Open timetable",
+            filetypes=[("json", "*.json")],
+            # parent=self.master
+        )
+        loaded = None
+        try:
+            with open(file_path, "r") as f:
+                loaded = f.read()
+        except FileNotFoundError:
+            self.show_dialog_box("ERROR: File %s not found" % file_path)
+            return
+
+        try:
+            loaded = json.loads(loaded)
+        except json.decoder.JSONDecodeError:
+            self.show_dialog_box("ERROR: Invalid JSON file format")
+            return
+
+        result = self.validate_json(loaded)
+        if not result:
+            self.show_dialog_box("ERROR: Invalid Goptable file format")
+            return
+
+        ## pass the attributes to each of the components
+
+        self.task_manager.set_state(result['tasks'])
+
+        self.time_manager.set_state(result['breaks'], result['work_interval'], result['start_time'])
+
+        self.table_manager.set_state(result['start_date'], result['days'], result['table'])
+
+    def validate_json(self, loaded):
+        if not loaded:
+            return None
+        if 'tasks' not in loaded or not isinstance(loaded['tasks'], list):
+            return None
+        if 'breaks' not in loaded or not isinstance(loaded['breaks'], list):
+            return None
+        if 'work_interval' not in loaded or not isinstance(loaded['work_interval'], str):
+            return None
+        if 'start_time' not in loaded or not isinstance(loaded['start_time'], str):
+            return None
+        if 'start_date' not in loaded or not isinstance(loaded['start_date'], str):
+            return None
+        if 'days' not in loaded or not isinstance(loaded['days'], int):
+            return None
+        if 'table' not in loaded or not isinstance(loaded['table'], list):
+            return None
+        result = {}
+        result['tasks'] = []
+        for (name, score) in loaded['tasks']:
+            result['tasks'].append((name, score))
+
+        result['breaks'] = []
+        for br in loaded['breaks']:
+            br_dur = parse_duration(br)
+
+            if br_dur is None:
+                return None
+            else:
+                result['breaks'].append(br_dur)
+
+        wk_dur = parse_duration(loaded['work_interval'])
+        if not wk_dur:
+            return None
+        else:
+            result['work_interval'] = wk_dur
+
+        st_tm = parse_time(loaded['start_time'])
+        if not st_tm:
+            return None
+        else:
+            result['start_time'] = st_tm
+
+        try:
+            result['start_date'] = datetime.strptime(loaded['start_date'], "%d-%m-%Y")
+        except ValueError:
+            return None
+
+        result['days'] = loaded['days']
+        result['table'] = loaded['table']
+
+        return result
+
+    def on_export(self):
+        pass
 
     def on_tasks_changed(self, tasks):
         self.table_manager.set_tasks(tasks)
 
     def on_schedule_changed(self, start_time, work_length, break_durations):
-        work_intervals =  []
+        work_intervals = []
         current_time = datetime.now()
         current_time = datetime.combine(current_time, start_time)
-        work_intervals.append("%s-%s" % (datetime.strftime(current_time, "%H:%M"), datetime.strftime(current_time + work_length, "%H:%M")))
+        work_intervals.append("%s-%s" % (
+        datetime.strftime(current_time, "%H:%M"), datetime.strftime(current_time + work_length, "%H:%M")))
         current_time = current_time + work_length
 
         for br in break_durations:
             current_time = current_time + br
-            work_intervals.append("%s-%s" % (datetime.strftime(current_time, "%H:%M"), datetime.strftime(current_time + work_length, "%H:%M")))
+            work_intervals.append("%s-%s" % (
+            datetime.strftime(current_time, "%H:%M"), datetime.strftime(current_time + work_length, "%H:%M")))
             current_time = current_time + work_length
 
         self.table_manager.set_work_intervals(work_intervals)
+
+    def on_table_stats_change(self, text):
+        if self.stats_manager is not None:
+            self.stats_manager.set_text(text)
 
 
 class TableManager:
     """
     Synthesises information from the schedule and the tasks to construct a schedule
     """
+
     def set_tasks(self, tasks):
         self.tasks = tasks
         self.parameters_changed()
-
 
     def set_work_intervals(self, work_intervals):
         self.work_intervals = work_intervals
@@ -97,7 +296,7 @@ class TableManager:
         self.days = days
 
         self.task_choices = set(task[0] for task in self.tasks)
-        self.task_choices.add( 'None')
+        self.task_choices.add('None')
 
         self.colouring = dict(zip(sorted(task[0] for task in self.tasks), cycle(grid_colours)))
         self.colouring["None"] = "#A4A9AD"
@@ -106,6 +305,7 @@ class TableManager:
         self.grid = [[None for i in range(self.no_days)] for i in range(len(self.work_intervals))]
 
         self.construct_grid()
+        self.stats_change()
 
     def construct_grid(self):
 
@@ -113,19 +313,19 @@ class TableManager:
             self.grid_panel.pack_forget()
 
         self.grid_panel = tk.Frame(self.master)
-        self.grid_panel.pack(fill=tk.BOTH,expand=True)
-
+        self.grid_panel.pack(fill=tk.BOTH, expand=True)
 
         for i in range(len(self.work_intervals)):
-            tk.Label(self.grid_panel, text=self.work_intervals[i]).grid(row=i+1, column=0, columnspan=1,rowspan=1)
+            tk.Label(self.grid_panel, text=self.work_intervals[i]).grid(row=i + 1, column=0, columnspan=1, rowspan=1)
 
         for j in range(len(self.days)):
-            tk.Label(self.grid_panel, text=datetime.strftime(self.days[j], "%a")).grid(row=0, column=j+1, columnspan=1,rowspan=1)
+            tk.Label(self.grid_panel, text=datetime.strftime(self.days[j], "%a")).grid(row=0, column=j + 1,
+                                                                                       columnspan=1, rowspan=1)
 
         for i in range(len(self.work_intervals)):
             for j in range(len(self.days)):
-                grid_i = i+1
-                grid_j = j+1
+                grid_i = i + 1
+                grid_j = j + 1
                 value = "None"
 
                 if self.old_grid is not None:
@@ -136,34 +336,75 @@ class TableManager:
                                 if old_value in self.task_choices:
                                     value = old_value
 
-
                 namevar = tk.StringVar()
                 namevar.set(value)
-                namevar.trace_add("write", lambda *args,i=i,j=j: self.grid_box_change(i,j))
-                print(self.colouring)
-                color = self.colouring[value]
-                print(self.colouring[value])
+                namevar.trace_add("write", lambda *args, i=i, j=j: self.grid_box_change(i, j))
                 option_menu = tk.OptionMenu(self.grid_panel, namevar,
-                                            command=lambda colour=color, i=i,j=j: self.grid_box_change(i,j,colour),
+                                            command=lambda i=i, j=j: self.grid_box_change(i, j),
                                             *self.task_choices)
-                self.grid[i][j] = (option_menu,namevar)
+                color = self.colouring[value]
+                self.grid[i][j] = (option_menu, namevar)
                 self.grid[i][j][0].configure(bg=color)
-                self.grid[i][j][0].grid(row=grid_i, column=grid_j, columnspan=1, rowspan=1, stick=tk.N + tk.S + tk.E + tk.W)
+                self.grid[i][j][0].grid(row=grid_i, column=grid_j, columnspan=1, rowspan=1,
+                                        stick=tk.N + tk.S + tk.E + tk.W)
         self.old_grid = None
 
-    def grid_box_change(self, i,j, colour=None):
-        if colour is None:
-            colour = self.grid[i][j][1].get()
-        value = self.colouring["None"]
+    def grid_box_change(self, i, j):
+        colour = self.colouring["None"]
+        label = self.grid[i][j][1].get()
 
-        if colour in self.colouring:
-            value = self.colouring[colour]
+        if label in self.colouring:
+            colour = self.colouring[label]
 
-        self.grid[i][j][0].configure(bg=value)
+        self.grid[i][j][0].configure(bg=colour)
+        self.stats_change()
 
+    def stats_change(self):
+        result = ""
 
+        # come up with statistics
+        total_cells = len(self.work_intervals) * self.no_days
 
+        total_cost = 0
+        cost = {}
+        assigned_count = {}
+        aimed_count = {}
+        none_cells = 0
 
+        for task in self.tasks:
+            assigned_count[task[0]] = 0
+            cost[task[0]] = task[1]
+            total_cost += task[1]
+
+        if total_cost > 0:
+            for task in self.tasks:
+                cost[task[0]] = cost[task[0]] / total_cost
+                aimed_count[task[0]] = total_cells * cost[task[0]]
+
+        for i in range(len(self.work_intervals)):
+            for j in range(len(self.days)):
+                task = self.grid[i][j][1].get()
+                if task != 'None':
+                    assigned_count[task] += 1
+                else:
+                    none_cells += 1
+
+        result += "Total sessions: %d\n" % total_cells
+        if total_cells > 0:
+            result += "Proportion filled: %.1f (%d/%d)\n" % (
+            (total_cells - none_cells) / total_cells, total_cells - none_cells, total_cells)
+        result += "Empty cells: %d\n" % (none_cells)
+        result += "Tasks:\n"
+        for (task, name) in self.tasks:
+            assigned = assigned_count[task]
+            aimed = aimed_count[task]
+            if aimed > 0:
+                result += " - %s: %.1f (%d/%.1f) \n" % (task, assigned / aimed, assigned, aimed)
+            else:
+                result += " - %s: ~ (%d/%.1f) \n" % (task, assigned, aimed)
+
+        if self.on_stats_change is not None:
+            self.on_stats_change(result)
 
     def populate_table(self):
         total_cells = len(self.work_intervals) * self.no_days
@@ -181,18 +422,18 @@ class TableManager:
             return
 
         for task in self.tasks:
-            cost[task[0]] = cost[task[0]]/total_cost
+            cost[task[0]] = cost[task[0]] / total_cost
             aimed_count[task[0]] = total_cells * cost[task[0]]
 
         for i in range(self.no_days):
             choices_to_allocate = []
 
             # first we allocate the choices we need to assign this round
-            for (task,score) in self.tasks:
+            for (task, score) in self.tasks:
                 remaining = aimed_count[task] - assigned_count[task]
                 to_add = min(int(cost[task] * len(self.work_intervals)), int(remaining))
 
-                for i_ in range(min(int(to_add), int(len(self.work_intervals) -  len(choices_to_allocate)))):
+                for i_ in range(min(int(to_add), int(len(self.work_intervals) - len(choices_to_allocate)))):
                     choices_to_allocate.append(task)
 
             # if we have space remaining, then allocate by the tasks that have been least assigned
@@ -201,13 +442,13 @@ class TableManager:
 
                 # collate a list of the tasks, proportion that have been assigned
                 remains = []
-                for (task,assigned) in assigned_count.items():
+                for (task, assigned) in assigned_count.items():
                     if aimed_count[task] > 0:
-                        remains.append((task, assigned/aimed_count[task]))
+                        remains.append((task, assigned / aimed_count[task]))
 
                 # invert the list so that the lowest proportions have the largest values
                 max_prop = max(remains, key=lambda task: task[1])[1]
-                remains = sorted(((task, max_prop - prop) for (task,prop) in remains), key=lambda task:-task[1])
+                remains = sorted(((task, max_prop - prop) for (task, prop) in remains), key=lambda task: -task[1])
                 total = sum(task[1] for task in remains)
 
                 # do random roulette wheel selection for these ones
@@ -225,13 +466,15 @@ class TableManager:
                 assigned_count[task] += 1
 
             random.shuffle(choices_to_allocate)
-            for j,task in zip(range(len(self.work_intervals)), choices_to_allocate):
+            for j, task in zip(range(len(self.work_intervals)), choices_to_allocate):
                 wdgt = self.grid[j][i][1]
                 wdgt.set(task)
 
+        self.stats_change()
 
-    def __init__(self, master):
+    def __init__(self, master, on_stats_change=None):
         self.master = master
+        self.on_stats_change = on_stats_change
         self.start_date = datetime.now()
         self.no_days = 1
 
@@ -247,12 +490,12 @@ class TableManager:
 
         self.configure_start_date_customisation_panel()
 
-        tk.Button(self.table_customisation_panel, text="Populate", command=self.populate_table).pack(fill=tk.BOTH, expand=True)
+        tk.Button(self.table_customisation_panel, text="Populate", command=self.populate_table).pack(fill=tk.BOTH,
+                                                                                                     expand=True)
 
         self.grid_panel = None
 
         self.parameters_changed()
-
 
     def configure_start_date_customisation_panel(self):
         self.table_start_date_customisation_panel = tk.Frame(self.table_customisation_panel)
@@ -264,15 +507,18 @@ class TableManager:
         self.table_start_date_value.set(datetime.strftime(self.start_date, "%d-%m-%Y"))
         self.table_start_date_value.trace_add("write", self.table_start_date_edit_callback)
 
-
-        self.table_start_date_entry = tk.Entry(self.table_start_date_customisation_panel, textvariable=self.table_start_date_value)
+        self.table_start_date_entry = tk.Entry(self.table_start_date_customisation_panel,
+                                               textvariable=self.table_start_date_value)
         self.table_start_date_entry.pack(side=tk.LEFT, expand=True, fill=tk.X)
 
-
-        self.table_start_date_update_button = tk.Button(self.table_start_date_customisation_panel, text="Update Date", state=tk.DISABLED, command=self.table_start_date_update_callback)
+        self.table_start_date_update_button = tk.Button(self.table_start_date_customisation_panel, text="Update Date",
+                                                        state=tk.DISABLED,
+                                                        command=self.table_start_date_update_callback)
         self.table_start_date_update_button.pack(side=tk.LEFT, expand=True, fill=tk.X)
 
-        self.table_start_date_delete_button = tk.Button(self.table_start_date_customisation_panel, text="Reset Field", state=tk.DISABLED, command=self.table_start_date_delete_callback)
+        self.table_start_date_delete_button = tk.Button(self.table_start_date_customisation_panel, text="Reset Field",
+                                                        state=tk.DISABLED,
+                                                        command=self.table_start_date_delete_callback)
         self.table_start_date_delete_button.pack(side=tk.LEFT, expand=True, fill=tk.X)
 
     def retrieve_submitted_start_date(self):
@@ -286,7 +532,6 @@ class TableManager:
             return date
         else:
             return None
-
 
     def table_start_date_edit_callback(self, *args):
         dt = self.retrieve_submitted_start_date()
@@ -312,7 +557,6 @@ class TableManager:
         self.table_start_date_value.set(datetime.strftime(self.start_date, "%d-%m-%Y"))
         self.table_start_date_edit_callback()
 
-
     def configure_days_customisation_panel(self):
         self.table_days_customisation_panel = tk.Frame(self.table_customisation_panel)
         self.table_days_customisation_panel.pack(side=tk.LEFT, expand=True, fill=tk.X)
@@ -324,10 +568,10 @@ class TableManager:
             to=10000
         )
         self.table_days_customisation_counter.pack(side=tk.LEFT, expand=True, fill=tk.X)
-        self.table_days_customisation_update_button = tk.Button(self.table_days_customisation_panel, text="Update Days", state=tk.DISABLED, command=self.table_days_customisation_update_callback)
+        self.table_days_customisation_update_button = tk.Button(self.table_days_customisation_panel, text="Update Days",
+                                                                state=tk.DISABLED,
+                                                                command=self.table_days_customisation_update_callback)
         self.table_days_customisation_update_button.pack(side=tk.LEFT, expand=True, fill=tk.X)
-
-
 
     def retrieve_submitted_days(self):
         days = None
@@ -354,8 +598,28 @@ class TableManager:
         else:
             self.table_days_customisation_update_button.configure(state=tk.DISABLED)
 
+    def set_state(self, start_date, no_days, grid_values):
+        self.no_days = no_days
+        self.table_days_customisation_counter.delete(0, tk.END)
+        self.table_days_customisation_counter.insert(tk.INSERT, str(no_days))
+        self.parameters_changed()
+        self.table_days_modification()
 
+        self.start_date = start_date
+        self.table_start_date_value.set(datetime.strftime(start_date, "%d-%m-%Y"))
+        self.parameters_changed()
+        self.table_start_date_edit_callback()
 
+        self.old_grid = None
+
+        for i in range(len(self.work_intervals)):
+            for j in range(self.no_days):
+                label = None
+                if i < len(grid_values):
+                    if j < len(grid_values[i]):
+                        label = grid_values[i][j]
+                self.grid[i][j][1].set(label)
+        self.parameters_changed()
 
 
 class TimeManager:
@@ -532,7 +796,7 @@ class TimeManager:
         self.schedule_graph = tk.LabelFrame(master, text="Schedule Visualization")
         self.schedule_graph.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
 
-        self.schedule_figure = Figure(figsize=(5, 4), dpi=100,tight_layout=True)
+        self.schedule_figure = Figure(figsize=(5, 4), dpi=100, tight_layout=True)
         self.schedule_axes = self.schedule_figure.add_axes([0.1, 0.1, 0.8, 0.8])
         self.schedule_date_plotter = mdates.DateFormatter('%H:%M')
 
@@ -688,6 +952,26 @@ class TimeManager:
         self.start_time_value.set(time_to_str(self.start_time))
 
         self.start_time_callback()
+
+    def set_state(self, breaks, work_interval, start_time):
+        self.breaks_list.delete(0, tk.END)
+        for br in breaks:
+            self.breaks_list.insert(tk.END, timedelta_to_str(br))
+        self.break_durations = breaks
+
+        self.create_break_value.set("")
+        self.update_break_value.set("")
+
+        self.work_length = work_interval
+        self.start_time = start_time
+        self.work_length_duration_value.set(timedelta_to_str(work_interval))
+        self.start_time_value.set(time_to_str(start_time))
+
+        self.start_time_callback()
+        self.work_length_duration_callback()
+
+        self.parameters_updated()
+        self.create_break_edit_callback()
 
 
 class TaskManager:
@@ -964,6 +1248,20 @@ class TaskManager:
     def parameters_changed(self):
         if self.on_tasks_changed is not None:
             self.on_tasks_changed(list(self.tasks))
+
+    def set_state(self, tasks):
+        self.listbox.delete(0, tk.END)
+
+        self.clear_create_entries()
+
+        self.modify_index = None
+        self.update_modify_components_state()
+
+        self.tasks = tasks
+        for (name, score) in self.tasks:
+            self.listbox.insert(tk.END, "%s : %s" % (name, score))
+
+        self.parameters_changed()
 
 
 def main():
