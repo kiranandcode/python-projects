@@ -14,7 +14,7 @@ def construct_lz_compressor(initial_alphabet):
         output = []
         try:
             prefix_string = next(inp)
-        except ValueError:
+        except StopIteration:
             return []
 
         for char in inp:
@@ -61,11 +61,40 @@ def construct_lz_compressor(initial_alphabet):
 
 
 def construct_lz_decompressor(initial_alphabet):
-    mapping = dict(((x,i + 1) for i,x in enumerate(initial_alphabet)))
+    mapping = dict(((i + 1, (None, x)) for i,x in enumerate(initial_alphabet)))
 
 
-    def decompressor(str):
-        pass
+    def decompressor(string):
+
+        inp = iter(string)
+        output = []
+        stack = []
+
+        try:
+            code = next(inp)
+        except StopIteration:
+            return []
+
+        old_code = code
+        output.append(mapping[code])
+        fin_char = mapping[code]
+
+
+        while True:
+            code = next(inp)
+
+            if code not in mapping:
+                output.append(fin_char)
+                old_code = code
+                mapping[(old_code, fin_char)] = code
+            else:
+                pass
+
+
+        return output
+
+
+
 
 
     return deconstructor, mapping
