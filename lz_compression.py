@@ -3,12 +3,14 @@ s = 'ababcbababaaaaaaa'
 
 def construct_lz_compressor(initial_alphabet):
     mapping = dict(((x,i + 1) for i,x in enumerate(initial_alphabet)))
+    next_value = len(initial_alphabet) + 1
 
     def compressor(string : str) -> str:
 
-        next_value = len(initial_alphabet) + 1
-        prefix_string = None
+        nonlocal mapping
+        nonlocal next_value
 
+        prefix_string = None
         inp = iter(string)
 
         output = []
@@ -61,40 +63,73 @@ def construct_lz_compressor(initial_alphabet):
 
 
 def construct_lz_decompressor(initial_alphabet):
-    mapping = dict(((i + 1, (None, x)) for i,x in enumerate(initial_alphabet)))
+    mapping = dict((i + 1,  x) for i,x in enumerate(initial_alphabet))
+    next_code = len(initial_alphabet) + 1
 
 
     def decompressor(string):
+        nonlocal next_code
+        nonlocal mapping
 
         inp = iter(string)
         output = []
-        stack = []
 
         try:
-            code = next(inp)
+            prev_code = next(inp)
         except StopIteration:
             return []
 
-        old_code = code
-        output.append(mapping[code])
-        fin_char = mapping[code]
+        prev_word = mapping[prev_code]
+        output.append(prev_word)
 
 
-        while True:
-            code = next(inp)
+        for code in inp:
+            if code in mapping:
+                word = mapping[code]
+                prev_word = mapping[prev_code]
+                new_word = prev_word + word[0]
 
-            if code not in mapping:
-                output.append(fin_char)
-                old_code = code
-                mapping[(old_code, fin_char)] = code
+                # insert new word into mapping
+                mapping[next_code] = new_word
+                next_code += 1
+
+                output.append(word)
             else:
-                pass
+                prev_word = mapping[prev_code]
+                new_word = prev_word + prev_word[0]
 
+                # insert new word into mapping
+                mapping[next_code] = new_word
+                next_code += 1
+
+                output.append(new_word)
+
+            prev_code = code
 
         return output
 
 
 
+    return decompressor, mapping
 
 
-    return deconstructor, mapping
+def run_example():
+    input_alphabet = ['a','b','c']
+    compressor, cmap = construct_lz_compressor(input_alphabet)
+    decompressor, dmap = construct_lz_decompressor(input_alphabet)
+
+    print("String: {}".format(s))
+    compressed = compressor(s)
+    print("compressed: {}".format(compressed))
+    print("cmap: {}".format(str(cmap)))
+
+    decompressed = ''.join(decompressor(compressed))
+
+    print("decompressed: {}".format(decompressed))
+    print("dmap: {}".format(str(dmap)))
+
+    print('decompressed == s : {}'.format(decompressed == s))
+
+
+if __name__ == '__main__':
+    run_example()
